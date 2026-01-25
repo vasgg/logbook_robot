@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "logbook"
+version = "0.1.0"
+description = "Telegram bot for tracking content consumption"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "vasgg", email = "vas.g@me.com" }]
+requires-python = ">=3.13"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "aiogram>=3.15",
+    "sqlalchemy>=2.0",
+    "aiosqlite>=0.20",
+    "pydantic-settings>=2.0",
+    "greenlet>=3.0",
+    "sentry-sdk>=2.0",
+]
+
+[project.scripts]
+bot-run = "bot.main:run_main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 119
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["bot", "database"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.14",
+]
