@@ -22,6 +22,7 @@ CATEGORY_EMOJI = {
     Category.BOOKS: "\U0001f4da",
     Category.MOVIES: "\U0001f3ac",
     Category.SERIES: "\U0001f4fa",
+    Category.GAMES: "\U0001f3ae",
 }
 
 

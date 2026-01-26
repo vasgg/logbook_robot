@@ -10,6 +10,7 @@ class Category(StrEnum):
     BOOKS = auto()
     MOVIES = auto()
     SERIES = auto()
+    GAMES = auto()
 
 
 class ItemStatus(StrEnum):
