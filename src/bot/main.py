@@ -68,8 +68,14 @@ async def main() -> None:
     )
     dp = Dispatcher(storage=MemoryStorage())
 
-    dp.startup.register(lambda: on_startup(bot, settings))
-    dp.shutdown.register(lambda: on_shutdown(bot, settings))
+    async def _on_startup():
+        await on_startup(bot, settings)
+
+    async def _on_shutdown():
+        await on_shutdown(bot, settings)
+
+    dp.startup.register(_on_startup)
+    dp.shutdown.register(_on_shutdown)
 
     # Outer middleware (runs first)
     dp.update.outer_middleware(UpdatesDumperMiddleware())
