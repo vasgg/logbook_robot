@@ -26,6 +26,7 @@ from database.crud.item import (
     get_item,
     get_items,
     get_items_count,
+    get_logged_years,
     get_stats,
     get_total_stats,
     log_item,
@@ -128,7 +129,7 @@ async def view_item(callback: CallbackQuery, callback_data: ItemCb, session: Asy
         await callback.answer("Item not found")
         return
 
-    date_str = item.logged_at.strftime("%Y-%m-%d") if item.logged_at else item.created_at.strftime("%Y-%m-%d")
+    date_str = item.created_at.strftime("%Y-%m-%d")
     await callback.message.edit_text(
         text=f"<b>{item.title}</b>\n{date_str}",
         reply_markup=item_detail_kb(item.id, item.category.value, item.status, callback_data.page),
@@ -163,7 +164,7 @@ async def edit_item_title(message: Message, state: FSMContext, session: AsyncSes
         await message.answer("Item not found", reply_markup=main_menu_kb())
         return
 
-    date_str = item.logged_at.strftime("%Y-%m-%d") if item.logged_at else item.created_at.strftime("%Y-%m-%d")
+    date_str = item.created_at.strftime("%Y-%m-%d")
     await message.answer(
         text=f"Updated!\n\n<b>{item.title}</b>\n{date_str}",
         reply_markup=item_detail_kb(item.id, item.category.value, item.status, page),
@@ -216,8 +217,15 @@ async def delete_item_cb(callback: CallbackQuery, callback_data: ItemCb, user: U
 @router.callback_query(MenuCb.filter(F.action == "stats"))
 async def stats_menu(callback: CallbackQuery, user: User, session: AsyncSession) -> None:
     totals = await get_total_stats(user.id, session)
+    years = await get_logged_years(user.id, session)
+
     text = f"<b>Your stats</b>\n\nBacklog: {totals['backlog']}\nLogged: {totals['logged']}"
-    await callback.message.edit_text(text=text, reply_markup=stats_kb())
+
+    if years:
+        await callback.message.edit_text(text=text, reply_markup=stats_kb(years))
+    else:
+        text += "\n\n<i>No logged items yet to show yearly stats.</i>"
+        await callback.message.edit_text(text=text, reply_markup=main_menu_kb())
 
 
 @router.callback_query(MenuCb.filter(F.action == "stats_year"))

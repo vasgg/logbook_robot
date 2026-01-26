@@ -1,6 +1,4 @@
-from datetime import datetime
-
-from sqlalchemy import extract, func, select
+from sqlalchemy import distinct, extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.enums import Category, ItemStatus
@@ -23,7 +21,6 @@ async def create_item(
         title=title,
         category=category,
         status=status,
-        logged_at=datetime.now() if status == ItemStatus.LOGGED else None,
     )
     session.add(item)
     await session.flush()
@@ -73,7 +70,6 @@ async def log_item(item_id: int, session: AsyncSession) -> Item | None:
     item = await get_item(item_id, session)
     if item:
         item.status = ItemStatus.LOGGED
-        item.logged_at = datetime.now()
         await session.flush()
     return item
 
@@ -106,7 +102,7 @@ async def get_stats(user_id: int, session: AsyncSession, year: int | None = None
             Item.status == ItemStatus.LOGGED,
         )
         if year:
-            query = query.where(extract("year", Item.logged_at) == year)
+            query = query.where(extract("year", Item.created_at) == year)
 
         result = await session.execute(query)
         stats[cat] = result.scalar_one()
@@ -132,3 +128,13 @@ async def get_total_stats(user_id: int, session: AsyncSession) -> dict:
         "backlog": backlog.scalar_one(),
         "logged": logged.scalar_one(),
     }
+
+
+async def get_logged_years(user_id: int, session: AsyncSession) -> list[int]:
+    """Get list of years with logged items, sorted descending."""
+    result = await session.execute(
+        select(distinct(extract("year", Item.created_at)))
+        .where(Item.user_id == user_id, Item.status == ItemStatus.LOGGED)
+        .order_by(extract("year", Item.created_at).desc())
+    )
+    return [int(year) for year in result.scalars().all()]

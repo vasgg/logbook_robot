@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from aiogram.filters.callback_data import CallbackData
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -130,22 +128,23 @@ def cancel_edit_kb(item_id: int):
     return builder.as_markup()
 
 
-def stats_kb():
+def stats_kb(years: list[int]):
     builder = InlineKeyboardBuilder()
-    current_year = datetime.now().year
-    builder.button(
-        text=f"\U0001f4c5 {current_year}",
-        callback_data=MenuCb(action="stats_year", year=current_year),
-    )
-    builder.button(
-        text=f"\U0001f4c5 {current_year - 1}",
-        callback_data=MenuCb(action="stats_year", year=current_year - 1),
-    )
+    for year in years:
+        builder.button(
+            text=f"\U0001f4c5 {year}",
+            callback_data=MenuCb(action="stats_year", year=year),
+        )
     builder.button(
         text="\u2b05 Back",
         callback_data=MenuCb(action="main"),
     )
-    builder.adjust(2, 1)
+    # Years in rows of 2, back button alone
+    rows = [2] * (len(years) // 2)
+    if len(years) % 2:
+        rows.append(1)
+    rows.append(1)
+    builder.adjust(*rows)
     return builder.as_markup()
 
 

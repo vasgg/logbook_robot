@@ -33,7 +33,6 @@ class Item(Base):
     category: Mapped[Category]
     status: Mapped[ItemStatus] = mapped_column(default=ItemStatus.BACKLOG)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    logged_at: Mapped[datetime | None] = mapped_column(nullable=True, default=None)
 
     user: Mapped["User"] = relationship(back_populates="items")
 
