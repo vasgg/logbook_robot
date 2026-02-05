@@ -11,8 +11,8 @@ def get_engine():
     @event.listens_for(engine.sync_engine, "connect")
     def set_sqlite_pragma(dbapi_connection, _):
         cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA journal_mode=DELETE")
+        cursor.execute("PRAGMA synchronous=FULL")
         cursor.execute("PRAGMA busy_timeout=5000")
         cursor.execute("PRAGMA cache_size=-64000")
         cursor.execute("PRAGMA foreign_keys=ON")
