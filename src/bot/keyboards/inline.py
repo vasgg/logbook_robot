@@ -65,8 +65,9 @@ def category_menu_kb(category: str, backlog_count: int, logged_count: int):
 
 def items_list_kb(items: list, category: str, status: ItemStatus, page: int, total: int, page_size: int):
     builder = InlineKeyboardBuilder()
+    emoji = CATEGORY_EMOJI[Category(category)]
     for item in items:
-        builder.button(text=item.title, callback_data=ItemCb(action="view", id=item.id, page=page))
+        builder.button(text=f"{emoji} {item.title}", callback_data=ItemCb(action="view", id=item.id, page=page))
 
     # Pagination
     has_prev = page > 0
