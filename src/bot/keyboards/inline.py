@@ -44,15 +44,15 @@ def category_menu_kb(category: str, backlog_count: int, logged_count: int):
         callback_data=ItemCb(action="add_backlog", category=category),
     )
     builder.button(
-        text="\u2705 Log",
+        text="\u2795 Log",
         callback_data=ItemCb(action="add_logged", category=category),
     )
     builder.button(
-        text=f"\U0001f4cb Backlog ({backlog_count})",
+        text=f"\U0001f4cb Show Backlog ({backlog_count})",
         callback_data=MenuCb(action="backlog", category=category),
     )
     builder.button(
-        text=f"\u2705 Logged ({logged_count})",
+        text=f"\u2705 Show Logged ({logged_count})",
         callback_data=MenuCb(action="logged", category=category),
     )
     builder.button(

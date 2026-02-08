@@ -47,12 +47,14 @@ class EditItem(StatesGroup):
 
 @router.callback_query(MenuCb.filter(F.action == "main"))
 async def main_menu(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
     await state.clear()
     await callback.message.edit_text(text="Choose a category:", reply_markup=main_menu_kb())
 
 
 @router.callback_query(MenuCb.filter(F.action == "category"))
 async def category_menu(callback: CallbackQuery, callback_data: MenuCb, user: User, session: AsyncSession) -> None:
+    await callback.answer()
     category = Category(callback_data.category)
     backlog = await get_items_count(user.id, category, ItemStatus.BACKLOG, session)
     logged = await get_items_count(user.id, category, ItemStatus.LOGGED, session)
@@ -64,6 +66,7 @@ async def category_menu(callback: CallbackQuery, callback_data: MenuCb, user: Us
 
 @router.callback_query(MenuCb.filter(F.action == "backlog"))
 async def backlog_list(callback: CallbackQuery, callback_data: MenuCb, user: User, session: AsyncSession) -> None:
+    await callback.answer()
     category = Category(callback_data.category)
     page = callback_data.page
     items = await get_items(user.id, category, ItemStatus.BACKLOG, session, page=page)
@@ -78,6 +81,7 @@ async def backlog_list(callback: CallbackQuery, callback_data: MenuCb, user: Use
 
 @router.callback_query(MenuCb.filter(F.action == "logged"))
 async def logged_list(callback: CallbackQuery, callback_data: MenuCb, user: User, session: AsyncSession) -> None:
+    await callback.answer()
     category = Category(callback_data.category)
     page = callback_data.page
     items = await get_items(user.id, category, ItemStatus.LOGGED, session, page=page)
@@ -92,6 +96,7 @@ async def logged_list(callback: CallbackQuery, callback_data: MenuCb, user: User
 
 @router.callback_query(ItemCb.filter(F.action.in_({"add_backlog", "add_logged"})))
 async def add_item_start(callback: CallbackQuery, callback_data: ItemCb, state: FSMContext) -> None:
+    await callback.answer()
     target_status = ItemStatus.BACKLOG if callback_data.action == "add_backlog" else ItemStatus.LOGGED
     await state.set_state(AddItem.title)
     await state.update_data(category=callback_data.category, target_status=target_status.value)
@@ -124,6 +129,7 @@ async def add_item_title(message: Message, state: FSMContext, user: User, sessio
 
 @router.callback_query(ItemCb.filter(F.action == "view"))
 async def view_item(callback: CallbackQuery, callback_data: ItemCb, session: AsyncSession) -> None:
+    await callback.answer()
     item = await get_item(callback_data.id, session)
     if not item:
         await callback.answer("Item not found")
@@ -138,6 +144,7 @@ async def view_item(callback: CallbackQuery, callback_data: ItemCb, session: Asy
 
 @router.callback_query(ItemCb.filter(F.action == "edit"))
 async def edit_item_start(callback: CallbackQuery, callback_data: ItemCb, state: FSMContext) -> None:
+    await callback.answer()
     await state.set_state(EditItem.title)
     await state.update_data(item_id=callback_data.id, page=callback_data.page)
     await callback.message.edit_text(
@@ -173,6 +180,7 @@ async def edit_item_title(message: Message, state: FSMContext, session: AsyncSes
 
 @router.callback_query(ItemCb.filter(F.action == "log"))
 async def log_item_cb(callback: CallbackQuery, callback_data: ItemCb, user: User, session: AsyncSession) -> None:
+    await callback.answer()
     item = await log_item(callback_data.id, session)
     if not item:
         await callback.answer("Item not found")
@@ -192,6 +200,7 @@ async def log_item_cb(callback: CallbackQuery, callback_data: ItemCb, user: User
 
 @router.callback_query(ItemCb.filter(F.action == "delete"))
 async def delete_item_cb(callback: CallbackQuery, callback_data: ItemCb, user: User, session: AsyncSession) -> None:
+    await callback.answer()
     item = await get_item(callback_data.id, session)
     if not item:
         await callback.answer("Item not found")
@@ -216,6 +225,7 @@ async def delete_item_cb(callback: CallbackQuery, callback_data: ItemCb, user: U
 # Stats handlers
 @router.callback_query(MenuCb.filter(F.action == "stats"))
 async def stats_menu(callback: CallbackQuery, user: User, session: AsyncSession) -> None:
+    await callback.answer()
     totals = await get_total_stats(user.id, session)
     years = await get_logged_years(user.id, session)
 
@@ -230,6 +240,7 @@ async def stats_menu(callback: CallbackQuery, user: User, session: AsyncSession)
 
 @router.callback_query(MenuCb.filter(F.action == "stats_year"))
 async def stats_year(callback: CallbackQuery, callback_data: MenuCb, user: User, session: AsyncSession) -> None:
+    await callback.answer()
     year = callback_data.year
     stats = await get_stats(user.id, session, year=year)
 
