@@ -1,3 +1,4 @@
+from aiogram.enums import ButtonStyle
 from aiogram.filters.callback_data import CallbackData
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -32,6 +33,7 @@ def main_menu_kb():
         builder.button(
             text=f"{CATEGORY_EMOJI[cat]} {cat.value.capitalize()}",
             callback_data=MenuCb(action="category", category=cat.value),
+            style=ButtonStyle.PRIMARY,
         )
     builder.adjust(1)
     return builder.as_markup()
@@ -42,18 +44,22 @@ def category_menu_kb(category: str, backlog_count: int, logged_count: int):
     builder.button(
         text="\u2795 Backlog",
         callback_data=ItemCb(action="add_backlog", category=category),
+        style=ButtonStyle.SUCCESS,
     )
     builder.button(
         text="\u2795 Log",
         callback_data=ItemCb(action="add_logged", category=category),
+        style=ButtonStyle.SUCCESS,
     )
     builder.button(
         text=f"\U0001f4cb Show Backlog ({backlog_count})",
         callback_data=MenuCb(action="backlog", category=category),
+        style=ButtonStyle.PRIMARY,
     )
     builder.button(
         text=f"\u2705 Show Logged ({logged_count})",
         callback_data=MenuCb(action="logged", category=category),
+        style=ButtonStyle.PRIMARY,
     )
     builder.button(
         text="\u2b05 Back",
@@ -67,7 +73,11 @@ def items_list_kb(items: list, category: str, status: ItemStatus, page: int, tot
     builder = InlineKeyboardBuilder()
     emoji = CATEGORY_EMOJI[Category(category)]
     for item in items:
-        builder.button(text=f"{emoji} {item.title}", callback_data=ItemCb(action="view", id=item.id, page=page))
+        builder.button(
+            text=f"{emoji} {item.title}",
+            callback_data=ItemCb(action="view", id=item.id, page=page),
+            style=ButtonStyle.PRIMARY,
+        )
 
     # Pagination
     has_prev = page > 0
@@ -100,14 +110,17 @@ def item_detail_kb(item_id: int, category: str, status: ItemStatus, page: int = 
         builder.button(
             text="\u2705 Log",
             callback_data=ItemCb(action="log", id=item_id, page=page),
+            style=ButtonStyle.SUCCESS,
         )
     builder.button(
         text="\u270f\ufe0f",
         callback_data=ItemCb(action="edit", id=item_id, page=page),
+        style=ButtonStyle.PRIMARY,
     )
     builder.button(
         text="\U0001f5d1",
         callback_data=ItemCb(action="delete", id=item_id, page=page),
+        style=ButtonStyle.DANGER,
     )
     builder.button(
         text="\u2b05 Back",
@@ -120,13 +133,21 @@ def item_detail_kb(item_id: int, category: str, status: ItemStatus, page: int = 
 
 def cancel_kb():
     builder = InlineKeyboardBuilder()
-    builder.button(text="\u274c Cancel", callback_data=MenuCb(action="main"))
+    builder.button(
+        text="\u274c Cancel",
+        callback_data=MenuCb(action="main"),
+        style=ButtonStyle.DANGER,
+    )
     return builder.as_markup()
 
 
 def cancel_edit_kb(item_id: int):
     builder = InlineKeyboardBuilder()
-    builder.button(text="\u274c Cancel", callback_data=ItemCb(action="view", id=item_id))
+    builder.button(
+        text="\u274c Cancel",
+        callback_data=ItemCb(action="view", id=item_id),
+        style=ButtonStyle.DANGER,
+    )
     return builder.as_markup()
 
 
@@ -136,6 +157,7 @@ def stats_kb(years: list[int]):
         builder.button(
             text=f"\U0001f4c5 {year}",
             callback_data=MenuCb(action="stats_year", year=year),
+            style=ButtonStyle.PRIMARY,
         )
     builder.button(
         text="\u2b05 Back",
