@@ -100,7 +100,12 @@ async def add_item_start(callback: CallbackQuery, callback_data: ItemCb, state: 
     target_status = ItemStatus.BACKLOG if callback_data.action == "add_backlog" else ItemStatus.LOGGED
     await state.set_state(AddItem.title)
     await state.update_data(category=callback_data.category, target_status=target_status.value)
-    await callback.message.edit_text(text="Enter title:", reply_markup=cancel_kb())
+    await callback.message.edit_text(
+        text=f"Category: {callback_data.category}\n"
+             f"Action: {callback_data.action.replace('_', ' ')}\n"
+             f"Enter title:",
+        reply_markup=cancel_kb(),
+    )
 
 
 @router.message(AddItem.title)
@@ -148,7 +153,9 @@ async def edit_item_start(callback: CallbackQuery, callback_data: ItemCb, state:
     await state.set_state(EditItem.title)
     await state.update_data(item_id=callback_data.id, page=callback_data.page)
     await callback.message.edit_text(
-        text="Enter new title:",
+        text=f"Category: {callback_data.category}\n"
+             f"Action: {callback_data.action.replace('_', ' ')}\n"
+             f"Enter new title:",
         reply_markup=cancel_edit_kb(callback_data.id),
     )
 
