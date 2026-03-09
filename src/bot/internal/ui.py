@@ -91,14 +91,15 @@ async def render_main_window_from_message(
     text: str,
     reply_markup: InlineKeyboardMarkup | None = None,
 ) -> tuple[int, int]:
-    return await _render_main_window(
-        bot=message.bot,
-        state=state,
-        fallback_message=message,
-        text=text,
-        reply_markup=reply_markup,
-        preferred_target=None,
-    )
+    previous_main_window = await get_main_window(state)
+    sent = await message.answer(text=text, reply_markup=reply_markup)
+    rendered_to = _message_ref(sent)
+    await set_main_window(state, *rendered_to)
+
+    if previous_main_window is not None and previous_main_window != rendered_to:
+        await _try_clear_keyboard(message.bot, previous_main_window[0], previous_main_window[1])
+
+    return rendered_to
 
 
 async def render_main_window_from_callback(
