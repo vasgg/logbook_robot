@@ -114,7 +114,7 @@ def item_detail_kb(item_id: int, category: str, status: ItemStatus, page: int = 
         )
     builder.button(
         text="\u270f\ufe0f",
-        callback_data=ItemCb(action="edit", id=item_id, page=page),
+        callback_data=ItemCb(action="edit", id=item_id, category=category, page=page),
         style=ButtonStyle.PRIMARY,
     )
     builder.button(

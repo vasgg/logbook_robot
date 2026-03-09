@@ -5,6 +5,7 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.enums import Category, ItemStatus
+from bot.internal.ui import clear_flow_state, render_main_window_from_callback, render_main_window_from_message
 from bot.keyboards.inline import (
     CATEGORY_EMOJI,
     ItemCb,
@@ -45,27 +46,56 @@ class EditItem(StatesGroup):
     title = State()
 
 
+def _add_item_prompt_text(category: str, target_status: ItemStatus, error: str | None = None) -> str:
+    action = "add backlog" if target_status == ItemStatus.BACKLOG else "add logged"
+    text = f"Category: {category}\nAction: {action}\nEnter title:"
+    if error:
+        text = f"{text}\n\n{error}"
+    return text
+
+
+def _edit_item_prompt_text(category: str, error: str | None = None) -> str:
+    text = f"Category: {category}\nAction: edit\nEnter new title:"
+    if error:
+        text = f"{text}\n\n{error}"
+    return text
+
+
 @router.callback_query(MenuCb.filter(F.action == "main"))
 async def main_menu(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
-    await state.clear()
-    await callback.message.edit_text(text="Choose a category:", reply_markup=main_menu_kb())
+    await clear_flow_state(state)
+    await render_main_window_from_callback(callback, state, text="Choose a category:", reply_markup=main_menu_kb())
 
 
 @router.callback_query(MenuCb.filter(F.action == "category"))
-async def category_menu(callback: CallbackQuery, callback_data: MenuCb, user: User, session: AsyncSession) -> None:
+async def category_menu(
+    callback: CallbackQuery,
+    callback_data: MenuCb,
+    user: User,
+    session: AsyncSession,
+    state: FSMContext,
+) -> None:
     await callback.answer()
     category = Category(callback_data.category)
     backlog = await get_items_count(user.id, category, ItemStatus.BACKLOG, session)
     logged = await get_items_count(user.id, category, ItemStatus.LOGGED, session)
-    await callback.message.edit_text(
+    await render_main_window_from_callback(
+        callback,
+        state,
         text=f"{category.value.capitalize()}:",
         reply_markup=category_menu_kb(category.value, backlog, logged),
     )
 
 
 @router.callback_query(MenuCb.filter(F.action == "backlog"))
-async def backlog_list(callback: CallbackQuery, callback_data: MenuCb, user: User, session: AsyncSession) -> None:
+async def backlog_list(
+    callback: CallbackQuery,
+    callback_data: MenuCb,
+    user: User,
+    session: AsyncSession,
+    state: FSMContext,
+) -> None:
     await callback.answer()
     category = Category(callback_data.category)
     page = callback_data.page
@@ -73,14 +103,22 @@ async def backlog_list(callback: CallbackQuery, callback_data: MenuCb, user: Use
     total = await get_items_count(user.id, category, ItemStatus.BACKLOG, session)
 
     text = f"Backlog ({total}):" if items else "Backlog is empty"
-    await callback.message.edit_text(
+    await render_main_window_from_callback(
+        callback,
+        state,
         text=text,
         reply_markup=items_list_kb(items, category.value, ItemStatus.BACKLOG, page, total, PAGE_SIZE),
     )
 
 
 @router.callback_query(MenuCb.filter(F.action == "logged"))
-async def logged_list(callback: CallbackQuery, callback_data: MenuCb, user: User, session: AsyncSession) -> None:
+async def logged_list(
+    callback: CallbackQuery,
+    callback_data: MenuCb,
+    user: User,
+    session: AsyncSession,
+    state: FSMContext,
+) -> None:
     await callback.answer()
     category = Category(callback_data.category)
     page = callback_data.page
@@ -88,7 +126,9 @@ async def logged_list(callback: CallbackQuery, callback_data: MenuCb, user: User
     total = await get_items_count(user.id, category, ItemStatus.LOGGED, session)
 
     text = f"Logged ({total}):" if items else "Nothing logged yet"
-    await callback.message.edit_text(
+    await render_main_window_from_callback(
+        callback,
+        state,
         text=text,
         reply_markup=items_list_kb(items, category.value, ItemStatus.LOGGED, page, total, PAGE_SIZE),
     )
@@ -98,12 +138,16 @@ async def logged_list(callback: CallbackQuery, callback_data: MenuCb, user: User
 async def add_item_start(callback: CallbackQuery, callback_data: ItemCb, state: FSMContext) -> None:
     await callback.answer()
     target_status = ItemStatus.BACKLOG if callback_data.action == "add_backlog" else ItemStatus.LOGGED
+    await clear_flow_state(state)
     await state.set_state(AddItem.title)
-    await state.update_data(category=callback_data.category, target_status=target_status.value)
-    await callback.message.edit_text(
-        text=f"Category: {callback_data.category}\n"
-             f"Action: {callback_data.action.replace('_', ' ')}\n"
-             f"Enter title:",
+    await state.update_data(
+        category=callback_data.category,
+        target_status=target_status.value,
+    )
+    await render_main_window_from_callback(
+        callback,
+        state,
+        text=_add_item_prompt_text(callback_data.category, target_status),
         reply_markup=cancel_kb(),
     )
 
@@ -114,48 +158,74 @@ async def add_item_title(message: Message, state: FSMContext, user: User, sessio
     category = Category(data["category"])
     target_status = ItemStatus(data["target_status"])
 
-    title = message.text.strip()[:MAX_TITLE_LENGTH]
+    title = (message.text or "").strip()[:MAX_TITLE_LENGTH]
     if not title:
-        await message.answer("Title cannot be empty. Try again:", reply_markup=cancel_kb())
+        await render_main_window_from_message(
+            message,
+            state,
+            text=_add_item_prompt_text(category.value, target_status, error="Title cannot be empty. Try again:"),
+            reply_markup=cancel_kb(),
+        )
         return
 
     await create_item(user.id, title, category, session, status=target_status)
-    await state.clear()
-
     backlog = await get_items_count(user.id, category, ItemStatus.BACKLOG, session)
     logged = await get_items_count(user.id, category, ItemStatus.LOGGED, session)
 
-    status_text = "backlog" if target_status == ItemStatus.BACKLOG else "logged"
-    await message.answer(
-        text=f"Added to {status_text}!\n\n{category.value.capitalize()}:",
+    await render_main_window_from_message(
+        message,
+        state,
+        text=f"Added to {'backlog' if target_status == ItemStatus.BACKLOG else 'logged'}!\n\n"
+        f"{category.value.capitalize()}:",
         reply_markup=category_menu_kb(category.value, backlog, logged),
     )
+    await clear_flow_state(state)
 
 
 @router.callback_query(ItemCb.filter(F.action == "view"))
-async def view_item(callback: CallbackQuery, callback_data: ItemCb, session: AsyncSession) -> None:
-    await callback.answer()
+async def view_item(callback: CallbackQuery, callback_data: ItemCb, session: AsyncSession, state: FSMContext) -> None:
     item = await get_item(callback_data.id, session)
     if not item:
         await callback.answer("Item not found")
         return
 
+    await callback.answer()
     date_str = item.created_at.strftime("%Y-%m-%d")
-    await callback.message.edit_text(
+    await render_main_window_from_callback(
+        callback,
+        state,
         text=f"<b>{item.title}</b>\n{date_str}",
         reply_markup=item_detail_kb(item.id, item.category.value, item.status, callback_data.page),
     )
 
 
 @router.callback_query(ItemCb.filter(F.action == "edit"))
-async def edit_item_start(callback: CallbackQuery, callback_data: ItemCb, state: FSMContext) -> None:
+async def edit_item_start(
+    callback: CallbackQuery,
+    callback_data: ItemCb,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    category = callback_data.category
+    if category is None:
+        item = await get_item(callback_data.id, session)
+        if not item:
+            await callback.answer("Item not found")
+            return
+        category = item.category.value
+
     await callback.answer()
+    await clear_flow_state(state)
     await state.set_state(EditItem.title)
-    await state.update_data(item_id=callback_data.id, page=callback_data.page)
-    await callback.message.edit_text(
-        text=f"Category: {callback_data.category}\n"
-             f"Action: {callback_data.action.replace('_', ' ')}\n"
-             f"Enter new title:",
+    await state.update_data(
+        item_id=callback_data.id,
+        category=category,
+        page=callback_data.page,
+    )
+    await render_main_window_from_callback(
+        callback,
+        state,
+        text=_edit_item_prompt_text(category),
         reply_markup=cancel_edit_kb(callback_data.id),
     )
 
@@ -164,30 +234,43 @@ async def edit_item_start(callback: CallbackQuery, callback_data: ItemCb, state:
 async def edit_item_title(message: Message, state: FSMContext, session: AsyncSession) -> None:
     data = await state.get_data()
     item_id = data["item_id"]
+    category = data["category"]
     page = data["page"]
 
-    title = message.text.strip()[:MAX_TITLE_LENGTH]
+    title = (message.text or "").strip()[:MAX_TITLE_LENGTH]
     if not title:
-        await message.answer("Title cannot be empty. Try again:", reply_markup=cancel_edit_kb(item_id))
+        await render_main_window_from_message(
+            message,
+            state,
+            text=_edit_item_prompt_text(category, error="Title cannot be empty. Try again:"),
+            reply_markup=cancel_edit_kb(item_id),
+        )
         return
 
     item = await update_item_title(item_id, title, session)
-    await state.clear()
-
     if not item:
-        await message.answer("Item not found", reply_markup=main_menu_kb())
+        await render_main_window_from_message(message, state, text="Item not found", reply_markup=main_menu_kb())
+        await clear_flow_state(state)
         return
 
     date_str = item.created_at.strftime("%Y-%m-%d")
-    await message.answer(
+    await render_main_window_from_message(
+        message,
+        state,
         text=f"Updated!\n\n<b>{item.title}</b>\n{date_str}",
         reply_markup=item_detail_kb(item.id, item.category.value, item.status, page),
     )
+    await clear_flow_state(state)
 
 
 @router.callback_query(ItemCb.filter(F.action == "log"))
-async def log_item_cb(callback: CallbackQuery, callback_data: ItemCb, user: User, session: AsyncSession) -> None:
-    await callback.answer()
+async def log_item_cb(
+    callback: CallbackQuery,
+    callback_data: ItemCb,
+    user: User,
+    session: AsyncSession,
+    state: FSMContext,
+) -> None:
     item = await log_item(callback_data.id, session)
     if not item:
         await callback.answer("Item not found")
@@ -199,15 +282,22 @@ async def log_item_cb(callback: CallbackQuery, callback_data: ItemCb, user: User
     total = await get_items_count(user.id, item.category, ItemStatus.BACKLOG, session)
 
     text = f"Backlog ({total}):" if items else "Backlog is empty"
-    await callback.message.edit_text(
+    await render_main_window_from_callback(
+        callback,
+        state,
         text=text,
         reply_markup=items_list_kb(items, item.category.value, ItemStatus.BACKLOG, page, total, PAGE_SIZE),
     )
 
 
 @router.callback_query(ItemCb.filter(F.action == "delete"))
-async def delete_item_cb(callback: CallbackQuery, callback_data: ItemCb, user: User, session: AsyncSession) -> None:
-    await callback.answer()
+async def delete_item_cb(
+    callback: CallbackQuery,
+    callback_data: ItemCb,
+    user: User,
+    session: AsyncSession,
+    state: FSMContext,
+) -> None:
     item = await get_item(callback_data.id, session)
     if not item:
         await callback.answer("Item not found")
@@ -223,7 +313,9 @@ async def delete_item_cb(callback: CallbackQuery, callback_data: ItemCb, user: U
     total = await get_items_count(user.id, category, status, session)
 
     text = f"{status.value.capitalize()} ({total}):" if items else f"{status.value.capitalize()} is empty"
-    await callback.message.edit_text(
+    await render_main_window_from_callback(
+        callback,
+        state,
         text=text,
         reply_markup=items_list_kb(items, category.value, status, page, total, PAGE_SIZE),
     )
@@ -231,22 +323,29 @@ async def delete_item_cb(callback: CallbackQuery, callback_data: ItemCb, user: U
 
 # Stats handlers
 @router.callback_query(MenuCb.filter(F.action == "stats"))
-async def stats_menu(callback: CallbackQuery, user: User, session: AsyncSession) -> None:
+async def stats_menu(callback: CallbackQuery, user: User, session: AsyncSession, state: FSMContext) -> None:
     await callback.answer()
     totals = await get_total_stats(user.id, session)
     years = await get_logged_years(user.id, session)
 
     text = f"<b>Your stats</b>\n\nBacklog: {totals['backlog']}\nLogged: {totals['logged']}"
+    await clear_flow_state(state)
 
     if years:
-        await callback.message.edit_text(text=text, reply_markup=stats_kb(years))
+        await render_main_window_from_callback(callback, state, text=text, reply_markup=stats_kb(years))
     else:
         text += "\n\n<i>No logged items yet to show yearly stats.</i>"
-        await callback.message.edit_text(text=text, reply_markup=main_menu_kb())
+        await render_main_window_from_callback(callback, state, text=text, reply_markup=main_menu_kb())
 
 
 @router.callback_query(MenuCb.filter(F.action == "stats_year"))
-async def stats_year(callback: CallbackQuery, callback_data: MenuCb, user: User, session: AsyncSession) -> None:
+async def stats_year(
+    callback: CallbackQuery,
+    callback_data: MenuCb,
+    user: User,
+    session: AsyncSession,
+    state: FSMContext,
+) -> None:
     await callback.answer()
     year = callback_data.year
     stats = await get_stats(user.id, session, year=year)
@@ -258,4 +357,4 @@ async def stats_year(callback: CallbackQuery, callback_data: MenuCb, user: User,
         total += count
     lines.append(f"\nTotal: {total}")
 
-    await callback.message.edit_text(text="\n".join(lines), reply_markup=stats_year_kb(year))
+    await render_main_window_from_callback(callback, state, text="\n".join(lines), reply_markup=stats_year_kb(year))
